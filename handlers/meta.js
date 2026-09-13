@@ -2,21 +2,21 @@ const { fetchAnimeDetail } = require("../scrapers/anime");
 const { decodeSeriesId, encodeVideoId } = require("../utils/idScheme");
 const cache = require("../cache");
 
-const TTL_META = 30 * 60 * 1000; // 30 min
+const TTL_META = 30 * 60 * 1000;
 
 async function metaHandler({ type, id }) {
   if (type !== "series") return { meta: null };
 
-  const slug = decodeSeriesId(id);
-  const cacheKey = `meta:${slug}`;
+  const { source, slug } = decodeSeriesId(id);
+  const cacheKey = `meta:${source}:${slug}`;
 
   const cached = cache.get(cacheKey);
   if (cached) return { meta: cached };
 
-  const detail = await fetchAnimeDetail(slug);
+  const detail = await fetchAnimeDetail(source, slug);
 
   const videos = detail.episodes.map((ep) => ({
-    id: encodeVideoId(slug, ep.number),
+    id: encodeVideoId(source, slug, ep.number),
     title: ep.title,
     season: 1,
     episode: ep.number

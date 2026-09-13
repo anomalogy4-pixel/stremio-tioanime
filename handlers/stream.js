@@ -3,7 +3,7 @@ const { decodeVideoId } = require("../utils/idScheme");
 const { resolveAll } = require("../utils/extractors");
 const cache = require("../cache");
 
-const TTL_STREAM = 4 * 60 * 60 * 1000; // 4 hours
+const TTL_STREAM = 4 * 60 * 60 * 1000;
 
 async function streamHandler({ type, id }) {
   if (type !== "series") return { streams: [] };
@@ -12,22 +12,18 @@ async function streamHandler({ type, id }) {
   const cached = cache.get(cacheKey);
   if (cached) return { streams: cached };
 
-  const { slug, epNum } = decodeVideoId(id);
-  const episodeSlug = `${slug}-${epNum}`;
+  const { source, slug, epNum } = decodeVideoId(id);
 
   let sources = [];
   try {
-    sources = await fetchEpisodeSources(episodeSlug);
+    sources = await fetchEpisodeSources(source, slug, epNum);
   } catch (err) {
-    console.error(`[stream] Failed to fetch sources for ${episodeSlug}:`, err.message);
+    console.error(`[stream] Failed to fetch sources for ${source}:${slug}:${epNum}:`, err.message);
     return { streams: [] };
   }
 
-  // Try to resolve embed URLs to direct stream URLs
   const resolved = await resolveAll(sources);
 
-  // Fallback: if no extractors worked, offer embed URLs as external links
-  // (Stremio can open some embeds via external player)
   const streams =
     resolved.length > 0
       ? resolved

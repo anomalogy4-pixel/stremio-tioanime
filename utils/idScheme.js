@@ -1,25 +1,30 @@
-const PREFIX = "tio:";
+// Series ID:  "tio:slug"  or  "lat:slug"
+// Video ID:   "tio:slug:epNum"  or  "lat:slug:epNum"
 
-function encodeSeriesId(slug) {
-  return PREFIX + slug;
+function encodeSeriesId(source, slug) {
+  return `${source}:${slug}`;
 }
 
 function decodeSeriesId(id) {
-  return id.replace(PREFIX, "");
+  const colonIdx = id.indexOf(":");
+  const source = id.slice(0, colonIdx);
+  const slug = id.slice(colonIdx + 1);
+  return { source, slug };
 }
 
-// videoId = "tio:slug:epNum"
-function encodeVideoId(slug, epNum) {
-  return `${PREFIX}${slug}:${epNum}`;
+function encodeVideoId(source, slug, epNum) {
+  return `${source}:${slug}:${epNum}`;
 }
 
-// Returns { slug, epNum }
+// Returns { source, slug, epNum }
 function decodeVideoId(id) {
-  const withoutPrefix = id.replace(PREFIX, "");
-  const lastColon = withoutPrefix.lastIndexOf(":");
-  const slug = withoutPrefix.slice(0, lastColon);
-  const epNum = parseInt(withoutPrefix.slice(lastColon + 1), 10);
-  return { slug, epNum };
+  const colonIdx = id.indexOf(":");
+  const source = id.slice(0, colonIdx);
+  const rest = id.slice(colonIdx + 1);
+  const lastColon = rest.lastIndexOf(":");
+  const slug = rest.slice(0, lastColon);
+  const epNum = parseInt(rest.slice(lastColon + 1), 10);
+  return { source, slug, epNum };
 }
 
 module.exports = { encodeSeriesId, decodeSeriesId, encodeVideoId, decodeVideoId };
