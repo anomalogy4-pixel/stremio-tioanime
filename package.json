@@ -1,0 +1,18 @@
+{
+  "name": "stremio-tioanime",
+  "version": "1.0.0",
+  "description": "Stremio add-on for tioanime.com - anime en español",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "stremio-addon-sdk": "^1.6.10",
+    "axios": "^1.6.7",
+    "cheerio": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
