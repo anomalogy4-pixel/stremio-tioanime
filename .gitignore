@@ -1,0 +1,11 @@
+node_modules/
+.env
+dump_*.html
+embed_*.html
+out*.txt
+main_*.txt
+emb_scripts.txt
+app.js
+oxserver.js
+example-animeflv/
+probe*.py

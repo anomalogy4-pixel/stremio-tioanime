@@ -1,0 +1,25 @@
+{
+  "name": "sololatino-stremio-addon",
+  "version": "1.0.0",
+  "description": "Stremio addon for SoloLatino.Net (sololatino.net): catalogo, metadata y streams en espanol latino de peliculas, series, animes y doramas. No afiliado a SoloLatino.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "keywords": [
+    "stremio",
+    "stremio-addon",
+    "sololatino",
+    "latino"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cheerio": "^1.1.2",
+    "dotenv": "^16.5.0",
+    "express": "^4.21.1",
+    "fuzzysort": "^3.1.0",
+    "unpacker": "^1.0.1"
+  }
+}
