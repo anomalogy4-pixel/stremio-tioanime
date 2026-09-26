@@ -1,6 +1,6 @@
 module.exports = {
   id: "community.tioanime.stremio",
-  version: "1.1.0",
+  version: "1.2.0",
   name: "My anime add-on",
   description: "Anime en español desde tioanime.com y latanime.org",
   logo: "https://tioanime.com/favicon.ico",

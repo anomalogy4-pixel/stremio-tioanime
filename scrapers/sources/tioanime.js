@@ -2,16 +2,15 @@ const cheerio = require("cheerio");
 const { get } = require("../../utils/http");
 
 const BASE_URL = "https://tioanime.com";
-const ITEMS_PER_PAGE = 24;
+// Verified against the live directory listing: 20 cards per page.
+const ITEMS_PER_PAGE = 20;
 
 async function fetchDirectory({ search = null, skip = 0 }) {
-  let url;
-  if (search) {
-    url = `${BASE_URL}/directorio?q=${encodeURIComponent(search)}`;
-  } else {
-    const page = Math.floor(skip / ITEMS_PER_PAGE) + 1;
-    url = `${BASE_URL}/directorio?p=${page}`;
-  }
+  // The directory paginates search results too, so skip must always be honoured.
+  const page = Math.floor(skip / ITEMS_PER_PAGE) + 1;
+  const url = search
+    ? `${BASE_URL}/directorio?q=${encodeURIComponent(search)}&p=${page}`
+    : `${BASE_URL}/directorio?p=${page}`;
 
   const html = await get(url, { headers: { Referer: `${BASE_URL}/` } });
   const $ = cheerio.load(html);
@@ -72,34 +71,39 @@ async function fetchAnimeDetail(slug) {
     if (g) genres.push(g);
   });
 
-  let year = null;
-  $("p, span").each((_, el) => {
-    const text = $(el).text();
-    const yearMatch = text.match(/\b(19|20)\d{2}\b/);
-    if (yearMatch && !year) year = parseInt(yearMatch[0], 10);
-  });
+  // <span class="year">2018</span>. Later ones belong to the "related" cards and
+  // the footer reads "2025 tioanime.com", so only the first is the anime's own.
+  const year = extractYear($("span.year").first().text() || "");
 
   const episodesArr = extractJsVar(html, "episodes") || [];
   const animeInfo = extractJsVar(html, "anime_info") || [];
   const animeSlug = animeInfo[1] || slug;
 
-  const sortedEpisodes = [...episodesArr].sort((a, b) => a - b);
-  const episodes = sortedEpisodes.map((num) => ({
-    number: num,
-    title: `Episodio ${num}`,
-    slug: `${animeSlug}-${num}`
-  }));
+  const episodes = episodesArr
+    .map((num) => Number(num))
+    .filter((num) => Number.isFinite(num))
+    .sort((a, b) => a - b)
+    .map((num) => ({
+      number: num,
+      title: `Episodio ${num}`,
+      slug: `${animeSlug}-${num}`
+    }));
 
   return { slug, title, description, posterUrl, genres, year, episodes };
 }
 
+function extractYear(text) {
+  const match = text.match(/\b(?:19|20)\d{2}\b/);
+  return match ? parseInt(match[0], 10) : null;
+}
+
 async function fetchEpisodeSources(slug, epNum) {
-  const episodeSlug = `${slug}-${epNum}`;
-  const url = `${BASE_URL}/ver/${episodeSlug}`;
+  const url = `${BASE_URL}/ver/${slug}-${epNum}`;
   const html = await get(url, { headers: { Referer: `${BASE_URL}/` } });
 
   const match = html.match(/var\s+videos\s*=\s*(\[[\s\S]*?\]);/);
   if (!match) return [];
+
   let videos = [];
   try {
     videos = JSON.parse(match[1]);
@@ -108,8 +112,12 @@ async function fetchEpisodeSources(slug, epNum) {
   }
 
   return videos
-    .filter(([, embedUrl]) => embedUrl && embedUrl.startsWith("http"))
-    .map(([provider, embedUrl]) => ({ host: provider, embedUrl }));
+    .filter(([, embedUrl]) => typeof embedUrl === "string" && embedUrl.startsWith("http"))
+    .map(([provider, embedUrl]) => ({
+      host: provider,
+      embedUrl,
+      referer: `${BASE_URL}/`
+    }));
 }
 
-module.exports = { fetchDirectory, fetchAnimeDetail, fetchEpisodeSources };
+module.exports = { fetchDirectory, fetchAnimeDetail, fetchEpisodeSources, ITEMS_PER_PAGE };

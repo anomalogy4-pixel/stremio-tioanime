@@ -17,13 +17,20 @@ async function catalogHandler({ type, id, extra }) {
   if (!source) return { metas: [] };
 
   const search = extra?.search || null;
-  const skip = parseInt(extra?.skip || "0", 10);
+  const skip = Number.parseInt(extra?.skip ?? "0", 10) || 0;
   const cacheKey = `catalog:${source}:${search || ""}:${skip}`;
 
   const cached = cache.get(cacheKey);
   if (cached) return { metas: cached };
 
-  const stubs = await fetchDirectory(source, { search, skip });
+  let stubs = [];
+  try {
+    stubs = await fetchDirectory(source, { search, skip });
+  } catch (err) {
+    // Returning an error makes Stremio mark the whole add-on as broken.
+    console.error(`[catalog] ${source} failed: ${err.message}`);
+    return { metas: [] };
+  }
 
   const metas = stubs.map((stub) => ({
     id: encodeSeriesId(source, stub.slug),

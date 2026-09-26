@@ -1,27 +1,25 @@
-const { get } = require("../http");
+const { getEmbed, USER_AGENT } = require("../http");
+const { unpack } = require("../packer");
 
-/**
- * Resolves mp4upload.com embed URLs to direct mp4 stream URLs.
- */
-async function resolve(embedUrl) {
-  try {
-    const html = await get(embedUrl, {
-      headers: {
-        Referer: "https://tioanime.com/"
-      }
-    });
+// mp4upload's player config is sometimes plain, sometimes inside a P.A.C.K.E.R block.
+const SRC = /(?:src|file)\s*:\s*["'](https?:\/\/[^"']+\.mp4[^"']*)["']/i;
+const ANY_MP4 = /["'](https?:\/\/[^"']+\.mp4[^"']*)["']/i;
 
-    // mp4upload typically embeds the source in a jwplayer setup call
-    const match = html.match(/file\s*:\s*["'](https?:\/\/[^"']+\.mp4[^"']*?)["']/i);
-    if (match) return match[1];
+async function resolve(embedUrl, { referer }) {
+  const html = String(await getEmbed(embedUrl, { headers: { Referer: referer } }));
+  const haystack = `${html}\n${unpack(html) || ""}`;
 
-    // Fallback: any mp4 URL
-    const fallback = html.match(/["'](https?:\/\/[^"']*mp4upload[^"']+\.mp4[^"']*?)["']/i);
-    if (fallback) return fallback[1];
-  } catch {
-    // Silent fail
-  }
-  return null;
+  const match = haystack.match(SRC) || haystack.match(ANY_MP4);
+  if (!match) return [];
+
+  return [
+    {
+      url: match[1],
+      quality: "MP4",
+      // The CDN returns 403 without this Referer.
+      headers: { "User-Agent": USER_AGENT, Referer: "https://www.mp4upload.com/" }
+    }
+  ];
 }
 
 module.exports = { resolve };

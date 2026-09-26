@@ -2,37 +2,45 @@ const cheerio = require("cheerio");
 const { get } = require("../../utils/http");
 
 const BASE_URL = "https://latanime.org";
-const ITEMS_PER_PAGE = 24;
+// Verified against the live listing: 30 cards per page.
+const ITEMS_PER_PAGE = 30;
 
 async function fetchDirectory({ search = null, skip = 0 }) {
-  let url;
-  if (search) {
-    url = `${BASE_URL}/buscar?q=${encodeURIComponent(search)}`;
-  } else {
-    const page = Math.floor(skip / ITEMS_PER_PAGE) + 1;
-    url = `${BASE_URL}/animes?p=${page}`;
-  }
+  const page = Math.floor(skip / ITEMS_PER_PAGE) + 1;
+  const url = search
+    ? `${BASE_URL}/buscar?q=${encodeURIComponent(search)}&p=${page}`
+    : `${BASE_URL}/animes?p=${page}`;
 
   const html = await get(url, { headers: { Referer: `${BASE_URL}/` } });
+  return parseCards(html);
+}
+
+// Browse cards lazy-load (<img class="lozad" data-src alt="Title">) while search
+// cards do not (<img src alt="">). Only the <h3> is present in both layouts.
+function parseCards(html) {
   const $ = cheerio.load(html);
   const results = [];
+  const seen = new Set();
 
-  // Cards: <a href="https://latanime.org/anime/slug"><div class="series"><img class="lozad" data-src="..." alt="Title">
   $("a[href*='/anime/']").each((_, el) => {
     const href = $(el).attr("href") || "";
     const match = href.match(/\/anime\/([^/?#]+)/);
     if (!match) return;
+
     const slug = match[1];
+    if (seen.has(slug)) return;
 
-    const img = $(el).find("img.lozad").first();
-    if (!img.length) return;
+    const card = $(el);
+    const img = card.find("img").last();
+    const title = card.find(".seriedetails h3").first().text().trim() || img.attr("alt") || "";
+    if (!title) return;
 
-    const title = img.attr("alt") || "";
-    const posterUrl = img.attr("data-src") || img.attr("src") || "";
+    // data-src holds the real poster; src is a placeholder while lazy-loading.
+    const poster = img.attr("data-src") || img.attr("src") || "";
+    const posterUrl = poster.startsWith("http") ? poster : `${BASE_URL}${poster}`;
 
-    if (slug && title) {
-      results.push({ slug, title, posterUrl, type: "series" });
-    }
+    seen.add(slug);
+    results.push({ slug, title, posterUrl, type: "series" });
   });
 
   return results;
@@ -57,32 +65,32 @@ async function fetchAnimeDetail(slug) {
     if (g) genres.push(g);
   });
 
-  let year = null;
-  $("p, span").each((_, el) => {
-    const text = $(el).text();
-    const yearMatch = text.match(/\b(19|20)\d{2}\b/);
-    if (yearMatch && !year) year = parseInt(yearMatch[0], 10);
-  });
+  // <span class="span-tiempo">Estreno: 03 de Abril de 2026</span>
+  const year =
+    extractYear($(".span-tiempo").first().text() || "") ||
+    extractYear($("*:contains('Estreno:')").last().text() || "");
 
   // Episodes: <a href="https://latanime.org/ver/{slug}-episodio-{N}">
   const episodes = [];
+  const seen = new Set();
   $("a[href*='/ver/']").each((_, el) => {
     const href = $(el).attr("href") || "";
-    const epMatch = href.match(/-episodio-(\d+)$/);
+    const epMatch = href.match(/-episodio-(\d+)(?:[/?#]|$)/);
     if (!epMatch) return;
     const num = parseInt(epMatch[1], 10);
-    if (!isNaN(num)) {
-      episodes.push({ number: num, title: `Episodio ${num}` });
-    }
+    if (Number.isNaN(num) || seen.has(num)) return;
+    seen.add(num);
+    episodes.push({ number: num, title: `Episodio ${num}` });
   });
 
-  // Sort ascending, deduplicate
-  const seen = new Set();
-  const sortedEpisodes = episodes
-    .filter((ep) => { if (seen.has(ep.number)) return false; seen.add(ep.number); return true; })
-    .sort((a, b) => a.number - b.number);
+  episodes.sort((a, b) => a.number - b.number);
 
-  return { slug, title, description, posterUrl, genres, year, episodes: sortedEpisodes };
+  return { slug, title, description, posterUrl, genres, year, episodes };
+}
+
+function extractYear(text) {
+  const match = text.match(/\b(?:19|20)\d{2}\b/);
+  return match ? parseInt(match[0], 10) : null;
 }
 
 async function fetchEpisodeSources(slug, epNum) {
@@ -98,7 +106,7 @@ async function fetchEpisodeSources(slug, epNum) {
     try {
       const embedUrl = Buffer.from(encoded, "base64").toString("utf-8");
       if (embedUrl.startsWith("http")) {
-        sources.push({ host, embedUrl });
+        sources.push({ host, embedUrl, referer: `${BASE_URL}/` });
       }
     } catch {
       // skip malformed base64
@@ -108,4 +116,4 @@ async function fetchEpisodeSources(slug, epNum) {
   return sources;
 }
 
-module.exports = { fetchDirectory, fetchAnimeDetail, fetchEpisodeSources };
+module.exports = { fetchDirectory, fetchAnimeDetail, fetchEpisodeSources, ITEMS_PER_PAGE };

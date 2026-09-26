@@ -6,25 +6,28 @@ function encodeSeriesId(source, slug) {
 }
 
 function decodeSeriesId(id) {
-  const colonIdx = id.indexOf(":");
-  const source = id.slice(0, colonIdx);
-  const slug = id.slice(colonIdx + 1);
-  return { source, slug };
+  const colonIdx = String(id || "").indexOf(":");
+  if (colonIdx === -1) return { source: null, slug: null };
+  return { source: id.slice(0, colonIdx), slug: id.slice(colonIdx + 1) || null };
 }
 
 function encodeVideoId(source, slug, epNum) {
   return `${source}:${slug}:${epNum}`;
 }
 
-// Returns { source, slug, epNum }
+// Returns { source, slug, epNum }. epNum is null when the id carries no episode.
 function decodeVideoId(id) {
-  const colonIdx = id.indexOf(":");
-  const source = id.slice(0, colonIdx);
-  const rest = id.slice(colonIdx + 1);
+  const { source, slug: rest } = decodeSeriesId(id);
+  if (!source || !rest) return { source: null, slug: null, epNum: null };
+
   const lastColon = rest.lastIndexOf(":");
-  const slug = rest.slice(0, lastColon);
-  const epNum = parseInt(rest.slice(lastColon + 1), 10);
-  return { source, slug, epNum };
+  // No trailing ":N" - this is a series id, not a video id.
+  if (lastColon === -1) return { source, slug: rest, epNum: null };
+
+  const epNum = Number.parseInt(rest.slice(lastColon + 1), 10);
+  if (!Number.isFinite(epNum)) return { source, slug: rest, epNum: null };
+
+  return { source, slug: rest.slice(0, lastColon), epNum };
 }
 
 module.exports = { encodeSeriesId, decodeSeriesId, encodeVideoId, decodeVideoId };
