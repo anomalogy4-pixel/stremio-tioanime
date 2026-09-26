@@ -131,7 +131,9 @@ function createProxyRouter() {
       upstream = await axios.get(target.url, {
         headers: upstreamHeaders,
         responseType: "stream",
-        timeout: 30000,
+        // Time to response headers, not to transfer the body. Mp4Upload has taken
+        // ~26s to answer from the deploy and tripped a 30s limit in production.
+        timeout: 90000,
         maxRedirects: 5,
         validateStatus: () => true,
         decompress: false
