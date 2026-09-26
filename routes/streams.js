@@ -135,41 +135,80 @@ async function tryPssStreams(embeds, label, base) {
 // Anything that fails is skipped (external fallbacks still returned).
 // Returned URL points to /proxy/hls so Stremio fetches via us (same IP that
 // resolved the signed asn= URL) instead of hitting the CDN directly.
+const LANG_LABELS = {
+  LAT: "Latino",
+  SUB: "Subtitulado",
+  ESP: "Castellano",
+  CAST: "Castellano",
+  ENG: "Ingles",
+};
+
+function langLabel(lang) {
+  return LANG_LABELS[lang] || lang || "Desconocido";
+}
+
+// LAT first, then SUB, then anything else — the order Stremio lists them in.
+function langRank(lang) {
+  return lang === "LAT" ? 0 : lang === "SUB" ? 1 : 2;
+}
+
 async function tryDirectStreams(embeds, label, base) {
-  const out = [];
   const e69 = embeds.filter((e) => /embed69\.org/i.test(e.url));
+  const unwrapped = await Promise.allSettled(e69.map((e) => unwrapEmbed69(e.url)));
+
+  // Group every decrypted vidhide video link by language. The previous version
+  // returned the first link that resolved, so a title carrying both a LAT and a
+  // SUB version (12 decrypted links for a typical movie) surfaced exactly one
+  // playable stream and discarded the rest.
+  const byLang = new Map();
+  for (const r of unwrapped) {
+    if (r.status !== "fulfilled") {
+      console.error("embed69 unwrap failed:", r.reason?.message || r.reason);
+      continue;
+    }
+    for (const link of r.value) {
+      if (link.kind !== "video" || !/vidhide/i.test(link.servername)) continue;
+      const lang = (link.lang || "").toUpperCase() || "???";
+      if (!byLang.has(lang)) byLang.set(lang, []);
+      byLang.get(lang).push(link);
+    }
+  }
+
+  const langs = [...byLang.keys()].sort(
+    (a, b) => langRank(a) - langRank(b) || a.localeCompare(b)
+  );
+  // One resolve per language, in parallel; within a language fall through the
+  // mirrors until one unpacks.
   const settled = await Promise.allSettled(
-    e69.map(async (e) => {
-      const links = await unwrapEmbed69(e.url);
-      // Prefer LAT video-kind links, vidhide server first (resolvable in Node).
-      const ordered = [...links].sort((a, b) => {
-        const langScore = (x) => (x.lang === "LAT" ? 0 : 1);
-        const srvScore = (x) => (/vidhide/i.test(x.servername) ? 0 : 1);
-        return langScore(a) - langScore(b) || srvScore(a) - srvScore(b) || 0;
-      });
-      for (const link of ordered) {
-        if (!/vidhide/i.test(link.servername) || link.kind !== "video") continue;
+    langs.map(async (lang) => {
+      for (const link of byLang.get(lang)) {
         try {
-          const direct = await resolveVidhideMirror(link.url);
-          return { link, direct };
+          return { lang, direct: await resolveVidhideMirror(link.url) };
         } catch (_) {}
       }
-      throw Error("no resolvable server link");
+      throw Error(`no resolvable vidhide link for ${lang}`);
     })
   );
+
+  const out = [];
+  const seen = new Set();
   for (const r of settled) {
     if (r.status !== "fulfilled") {
       if (r.reason) console.error("direct stream skipped:", r.reason.message || r.reason);
       continue;
     }
-    const { link, direct } = r.value;
+    const { lang, direct } = r.value;
+    if (seen.has(direct.url)) continue; // two mirrors can land on one CDN URL
+    seen.add(direct.url);
     const proxied = `${base}/proxy/hls?url=${encodeURIComponent(direct.url)}&referer=${encodeURIComponent(direct.referer || "")}`;
+    const name = langLabel(lang);
     out.push({
       url: proxied,
-      name: `SoloLatino\nVidhide Latino`,
-      description: `${label}\nDirecto Latino (HLS via proxy)\n${direct.url}`,
+      name: `SoloLatino\nVidhide ${name}`,
+      description: `${label}\nDirecto ${name} (HLS via proxy)\n${direct.url}`,
       behaviorHints: {
-        bingeGroup: "sololatino|vidhide",
+        // Per-language group so binge-watching stays in the chosen language.
+        bingeGroup: `sololatino|vidhide|${lang}`,
         notWebReady: true,
       },
     });
