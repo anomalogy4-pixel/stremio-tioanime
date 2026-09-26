@@ -13,9 +13,13 @@ const brotli = promisify(zlib.brotliDecompress);
 // Explicit config wins; otherwise it is learned from the first request, so a
 // deployment does not have to know its own domain up front.
 function configuredBase() {
-  if (process.env.ADDON_BASE_URL) return process.env.ADDON_BASE_URL.replace(/\/$/, "");
-  if (process.env.RAILWAY_PUBLIC_DOMAIN) return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
-  return null;
+  return process.env.ADDON_BASE_URL ? process.env.ADDON_BASE_URL.replace(/\/$/, "") : null;
+}
+
+// Only a hint: a platform can advertise a domain that no longer routes, which
+// would make every stream link point at a dead host.
+function platformBase() {
+  return process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null;
 }
 
 const FALLBACK_BASE = `http://127.0.0.1:${process.env.PORT || 7000}`;
@@ -30,8 +34,10 @@ function rememberBase(req) {
   learnedBase = `${proto}://${host}`;
 }
 
+// The host a request actually arrived on is proven reachable by that client,
+// so it beats anything the platform advertises.
 function baseUrl() {
-  return configuredBase() || learnedBase || FALLBACK_BASE;
+  return configuredBase() || learnedBase || platformBase() || FALLBACK_BASE;
 }
 
 const HOP_BY_HOP = new Set([
