@@ -47,6 +47,14 @@ app.get("/manifest.json", (_req, res) => {
   res.json(MANIFEST);
 });
 
+// Render pings this to decide the instance is alive, and an external cron hits
+// it on the free plan to hold off the 15-minute spin-down. Must stay cheap:
+// no scraping, no upstream calls.
+app.get("/health", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ ok: true, version: pkg.version, uptime: Math.round(process.uptime()) });
+});
+
 app.get("/", (_req, res) => {
   res.set("Content-Type", "text/html; charset=utf-8");
   res.send(`<h1>SoloLatino Stremio Addon v${pkg.version}</h1>

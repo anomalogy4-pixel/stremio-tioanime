@@ -21,5 +21,8 @@
     "express": "^4.21.1",
     "fuzzysort": "^3.1.0",
     "unpacker": "^1.0.1"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
