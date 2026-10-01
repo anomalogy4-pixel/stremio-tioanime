@@ -1,0 +1,15 @@
+# Render blueprint. Deploy: Render dashboard -> New -> Blueprint -> pick this repo.
+services:
+  - type: web
+    name: sololatino-stremio-addon
+    runtime: node
+    plan: free
+    region: oregon
+    branch: master
+    buildCommand: npm ci --omit=dev
+    startCommand: node index.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
