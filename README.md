@@ -13,6 +13,10 @@ npm start
 
 Install in Stremio from `http://127.0.0.1:7000/manifest.json`.
 
+The same server also hosts a second add-on, SoloLatino (movies and series from
+sololatino.net), installed separately from `http://127.0.0.1:7000/sololatino/manifest.json`.
+Its code lives in `sololatino/` and can still run alone with `node sololatino/index.js`.
+
 To play on a phone or TV on the same network, install from your LAN address instead
 (`http://192.168.x.x:7000/manifest.json`) — the add-on learns the host from the
 request, so stream links point back at the right place automatically.

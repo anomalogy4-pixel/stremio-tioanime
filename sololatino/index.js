@@ -55,17 +55,18 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, version: pkg.version, uptime: Math.round(process.uptime()) });
 });
 
-app.get("/", (_req, res) => {
+app.get("/", (req, res) => {
+  const b = req.baseUrl;
   res.set("Content-Type", "text/html; charset=utf-8");
   res.send(`<h1>SoloLatino Stremio Addon v${pkg.version}</h1>
 <p>${pkg.description}</p>
-<p>Manifiesto: <a href="/manifest.json">/manifest.json</a></p>
-<p>Instalar en Stremio (web): <code>https://&lt;tu-host&gt;/manifest.json</code></p>
+<p>Manifiesto: <a href="${b}/manifest.json">/manifest.json</a></p>
+<p>Instalar en Stremio (web): <code>https://&lt;tu-host&gt;${b}/manifest.json</code></p>
 <ul>
-<li>Catalogo peliculas: <a href="/catalog/movie/sololatino-peliculas.json">/catalog/movie/sololatino-peliculas.json</a></li>
-<li>Buscar: <a href="/catalog/movie/sololatino-peliculas/search=ted%20lasso.json">/catalog/movie/sololatino-peliculas/search=ted lasso.json</a></li>
-<li>Meta ejemplo: <a href="/meta/movie/sololatino:pelicula:one-last-shot.json">/meta/movie/sololatino:pelicula:one-last-shot.json</a></li>
-<li>Streams ejemplo: <a href="/stream/movie/sololatino:pelicula:one-last-shot.json">/stream/movie/sololatino:pelicula:one-last-shot.json</a></li>
+<li>Catalogo peliculas: <a href="${b}/catalog/movie/sololatino-peliculas.json">/catalog/movie/sololatino-peliculas.json</a></li>
+<li>Buscar: <a href="${b}/catalog/movie/sololatino-peliculas/search=ted%20lasso.json">/catalog/movie/sololatino-peliculas/search=ted lasso.json</a></li>
+<li>Meta ejemplo: <a href="${b}/meta/movie/sololatino:pelicula:one-last-shot.json">/meta/movie/sololatino:pelicula:one-last-shot.json</a></li>
+<li>Streams ejemplo: <a href="${b}/stream/movie/sololatino:pelicula:one-last-shot.json">/stream/movie/sololatino:pelicula:one-last-shot.json</a></li>
 </ul>`);
 });
 
@@ -74,23 +75,29 @@ app.use(require("./routes/meta"));
 app.use(require("./routes/proxy"));
 app.use(require("./routes/streams"));
 
-// A stray rejection (an abandoned scrape, a socket reset mid-proxy) terminates
-// the process under Node's default policy, which takes a 24/7 host down for an
-// error the request handler already reported. Log and keep serving.
-process.on("unhandledRejection", (err) => {
-  console.error("unhandledRejection:", (err && err.message) || err);
-});
-process.on("uncaughtException", (err) => {
-  console.error("uncaughtException:", (err && err.stack) || err);
-});
-
 // Unknown paths: answer in the shape Stremio expects instead of Express' HTML.
 app.use((req, res) => {
   res.status(404).json({ err: "not found", path: req.path });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`sololatino-stremio-addon listening on ${PORT}`);
-  console.log(`manifest: http://127.0.0.1:${PORT}/manifest.json`);
-});
+module.exports = app;
+
+// Standalone: `node sololatino/index.js`. In the combined server the root
+// index.js mounts this app under /sololatino and owns the process guards.
+if (require.main === module) {
+  // A stray rejection (an abandoned scrape, a socket reset mid-proxy) terminates
+  // the process under Node's default policy, which takes a 24/7 host down for an
+  // error the request handler already reported. Log and keep serving.
+  process.on("unhandledRejection", (err) => {
+    console.error("unhandledRejection:", (err && err.message) || err);
+  });
+  process.on("uncaughtException", (err) => {
+    console.error("uncaughtException:", (err && err.stack) || err);
+  });
+
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`sololatino-stremio-addon listening on ${PORT}`);
+    console.log(`manifest: http://127.0.0.1:${PORT}/manifest.json`);
+  });
+}

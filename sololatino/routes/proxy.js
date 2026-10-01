@@ -12,7 +12,7 @@ const UA =
 const HEADERS_TIMEOUT = 30000;
 
 function proxyUrl(req, path, targetUrl, referer) {
-  const base = `${req.protocol}://${req.get("host")}`;
+  const base = `${req.protocol}://${req.get("host")}${req.baseUrl}`;
   return `${base}${path}?url=${encodeURIComponent(targetUrl)}&referer=${encodeURIComponent(referer || "")}`;
 }
 

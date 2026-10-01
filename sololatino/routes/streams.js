@@ -80,7 +80,7 @@ async function handleStream(req, res) {
     }
 
     const { embeds } = await SL.getPagePlayerUrls(pageUrl);
-    const base = `${req.protocol}://${req.get("host")}`;
+    const base = `${req.protocol}://${req.get("host")}${req.baseUrl}`;
     const [e69, pss] = await Promise.allSettled([
       tryDirectStreams(embeds, label, base),
       tryPssStreams(embeds, label, base),
